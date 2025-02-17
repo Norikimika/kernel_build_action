@@ -409,7 +409,6 @@ runs:
                         update_config CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
                         update_config CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
                         update_config CONFIG_KSU_SUSFS_SUS_SU=y
-                        cat arch/${{ inputs.arch }}/configs/${{ inputs.config }}
                     echo "::endgroup::"
                 fi
                 if [ ${{ inputs.ksu-lkm }} = true ]; then
@@ -428,6 +427,12 @@ runs:
                 fi
             fi
             echo "::endgroup::"
+         fi
+
+         if [ ${{ inputs.ksu-susfs }} = true ]; then
+             cat arch/${{ inputs.arch }}/configs/${{ inputs.config }}
+         elif [ -n "${{ inputs.extra-conf }}" ]; then
+             cat arch/${{ inputs.arch }}/configs/${{ inputs.config }}
          fi
 
          if [ -f scripts/dtc/libfdt/mkdtboimg.py ]; then
