@@ -2,6 +2,9 @@
 name: Build Kernel
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - munch
 
 jobs:
   Build-Kernel:
@@ -13,18 +16,26 @@ jobs:
 
     steps:
     - name: Build Kernel
-      uses: dabao1955/kernel_build_action@main
+      uses: Norikimika/kernel_build_action@munch
       with:
-          kernel-url: https://github.com/AcmeUI-Devices/android_kernel_xiaomi_cas
-          kernel-dir: msm-4.19
-          kernel-branch: taffy
-          config: cas_defconfig
+          kernel-url: https://github.com/AOSPA/android_kernel_xiaomi_sm8250
+          kernel-branch: uvite
+          config: vendor/munch_defconfig
           arch: arm64
+          ksu: true
+          ksu-version: next-susfs
+          ksu-other: true
+          ksu-url: https://github.com/rifsxd/KernelSU-Next
+          ksu-susfs: true
+          ksu-susfs-branch: kernel-4.19
+          ccache: true
           aosp-gcc: true
           aosp-clang: true
-          ksu: true
-          ksu-version: main
-          android-version: 12
-          aosp-clang-version: r383902
+          aosp-clang-version: r547379
           disable-lto: true
           anykernel3: true
+          anykernel3-url: https://github.com/Norikimika/AnyKernel3
+          anykernel3-name: Uvite-Munch-KSU
+          anykernel3-string-name: Uvite By Norikimika
+          extra-cmd: LLVM=1 LLVM_IAS=1 LD=ld.lld LTO=thin
+          extra-conf: CONFIG_TMPFS_XATTR=y CONFIG_SDCARD_FS=y

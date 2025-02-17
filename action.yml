@@ -57,6 +57,14 @@ inputs:
     description: "Use 3rd KernelSU"
     required: false
     default: ""
+  ksu-susfs:
+    description: 'KernelSU SUSFS function support'
+    required: false
+    default: false
+  ksu-susfs-branch:
+    description: 'KernelSU SUSFS default branch'
+    required: false
+    default: "kernel-4.19"
   ksu-lkm:
     description: "Build KernelSU as a loadable kernel module"
     required: false
@@ -126,6 +134,14 @@ inputs:
     description: '3rdparty anykernrl3 url path'
     required: false
     default: ""
+  anykernel3-name:
+    description: 'Custom kernel zip name.'
+    required: false
+    default: "Munch"
+  anykernel3-string-name:
+    description: 'Custom string zip name.'
+    required: false
+    default: "Munch by Norikimika"
   bootimg-url:
     description: "boot.img path"
     required: false
@@ -141,6 +157,10 @@ inputs:
     description: 'Extra options of building kernel.'
     required: false
     default: ""
+  extra-conf:
+    description: 'Extra defconfig.'
+    required: false
+    default: ""
 
 runs:
   using: 'composite'
@@ -148,11 +168,16 @@ runs:
 
     - name: Setup ccache
       if: inputs.ccache == 'true'
-      uses: hendrikmuhs/ccache-action@v1.2
+      uses: hendrikmuhs/ccache-action@v1.2.17
       with:
-        key: ${{ inputs.config }}-0cb68f9cbcbb3de9c966cf66ed51471fbe51419e
-        max-size: 4G
+        key: ${{ inputs.config }}-KUKWt7P2dFQ8wheEDvKL6HRM57P33vehENE9v992M
+        max-size: 10G
         create-symlink: true
+        
+    - id: date
+      shell: bash
+      run: |
+         echo "BUILD_TIME=$(date +'%Y%m%d')" >> $GITHUB_ENV
 
     - name: Build Kernel
       shell: bash
@@ -219,6 +244,18 @@ runs:
                      git clone "$url" "$extract_dir" --depth=${{ inputs.depth }} -b "$branch"
                      ;;
              esac
+         }
+         
+         update_config() {
+             CONFIG_FILE="arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
+             input="$1"
+             key="${input%%=*}" 
+             value="${input#*=}"
+             if grep -q "^$key=" "$CONFIG_FILE"; then
+                 sed -i "s/^$key=.*/$key=$value/" "$CONFIG_FILE"
+             else
+                 echo "$key=$value" >> "$CONFIG_FILE"
+             fi
          }
 
          if [ ${{ inputs.aosp-clang }} = true ]; then
@@ -302,6 +339,15 @@ runs:
              done
          fi
 
+         if [ -n "${{ inputs.extra-conf }}" ]; then
+           sed -i '$a\# Extra' arch/${{ inputs.arch }}/configs/${{ inputs.config }}
+           EXTRAC="${{ inputs.extra-conf }}"
+           IFS=' ' read -r -a pairs <<< "$EXTRAC"
+             for pair in "${pairs[@]}"; do
+                 update_config "$pair"
+             done
+         fi
+
          function version_gt() { test "$(echo -e "$1\n$2" | sort -V | tail -n1)" == "$1"; }
          VERSION=$(grep -E '^VERSION = ' Makefile | awk '{print $3}')
          PATCHLEVEL=$(grep -E '^PATCHLEVEL = ' Makefile | awk '{print $3}')
@@ -314,21 +360,57 @@ runs:
 
          if [ ${{ inputs.ksu }} = true ]; then
             echo "::group:: Initializing KernelSU"
-            if [ -f KernelSU/kernel/Kconfig ]; then
-                echo "KernelSU has been initialized,skipped."
+            if [ -d "./KernelSU" ]; then
+                rm -rf "./KernelSU"
+            fi
+            if [ -d "./KernelSU-Next" ]; then
+                rm -rf "./KernelSU-Next"
+            fi
+            if [ -d "./drivers/kernelsu" ]; then
+                rm -rf "./drivers/kernelsu"
+            fi
+            if [ ${{ inputs.ksu-other }} = true ]; then
+                curl -SsL "${{ inputs.ksu-url }}/raw/${{ inputs.ksu-version }}/kernel/setup.sh" | bash -s ${{ inputs.ksu-version }}
             else
-                if [ ${{ inputs.ksu-other }} = true ]; then
-                    curl -SsL "${{ inputs.ksu-url }}/raw/${{ inputs.ksu-version }}/kernel/setup.sh" | bash -s ${{ inputs.ksu-version }}
+                echo "Kernel version: $VERSION.$PATCHLEVEL.$SUBLEVEL"
+                if [ -f nongki.txt ]; then
+                    printf "Warning: The KernelSU version you selected was detected to be ${{ inputs.ksu-version }}, but KernelSU has dropped support for the non-gki kernel since 0.9.5. \n This will force switch to v0.9.5.\n"
+                    export KVER=v0.9.5
                 else
-                    echo "Kernel version: $VERSION.$PATCHLEVEL.$SUBLEVEL"
-                    if [ -f nongki.txt ]; then
-                        printf "Warning: The KernelSU version you selected was detected to be ${{ inputs.ksu-version }}, but KernelSU has dropped support for the non-gki kernel since 0.9.5. \n This will force switch to v0.9.5.\n"
-                        export KVER=v0.9.5
-                    else
-                        export KVER=${{ inputs.ksu-version }}
-                    fi
-                        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s "$KVER"
-                    fi
+                    export KVER=${{ inputs.ksu-version }}
+                fi
+                    curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s "$KVER"
+                fi
+                if [ ${{ inputs.ksu }} = true ] && [ ${{ inputs.ksu-susfs }} = true ]; then
+                    echo "::group:: Setting up KernelSU SUSFS"
+                    git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "${{ inputs.ksu-susfs-branch }}"
+                        cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU-Next/
+                        cp ./susfs4ksu/kernel_patches/50_add_susfs_in_${{ inputs.ksu-susfs-branch }}.patch ./
+                        cp ./susfs4ksu/kernel_patches/fs/* ./fs/
+                        cp ./susfs4ksu/kernel_patches/include/linux/* ./include/linux/
+                    echo "::group:: Patch KSU makefile to auto patch kernelSource"
+                        patch -p1 < 50_add_susfs_in_${{ inputs.ksu-susfs-branch }}.patch || true
+                    echo "::group:: Adding configuration settings to defconfig..."
+                        sed -i '$a\# KernelSU - SUSFS' arch/${{ inputs.arch }}/configs/${{ inputs.config }}
+                        update_config CONFIG_KSU=y
+                        update_config CONFIG_KSU_SUSFS=y
+                        update_config CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+                        update_config CONFIG_KSU_SUSFS_SUS_PATH=y
+                        update_config CONFIG_KSU_SUSFS_SUS_MOUNT=y
+                        update_config CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+                        update_config CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+                        update_config CONFIG_KSU_SUSFS_SUS_KSTAT=n
+                        update_config CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y
+                        update_config CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+                        update_config CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+                        update_config CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+                        update_config CONFIG_KSU_SUSFS_ENABLE_LOG=y
+                        update_config CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+                        update_config CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+                        update_config CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+                        update_config CONFIG_KSU_SUSFS_SUS_SU=y
+                        cat arch/${{ inputs.arch }}/configs/${{ inputs.config }}
+                    echo "::endgroup::"
                 fi
                 if [ ${{ inputs.ksu-lkm }} = true ]; then
                     if grep -q "CONFIG_KPROBES=y" "arch/${{ inputs.arch }}/configs/${{ inputs.config }}" ; then
@@ -461,6 +543,8 @@ runs:
          echo "::endgroup::"
 
          unset CMD_PATH CMD_CC CMD_CLANG_TRIPLE CMD_CROSS_COMPILE CMD_CROSS_COMPILE_ARM32 USE_CCACHE CLANG_TRIPLE CROSS_COMPILE_ARM32 CROSS_COMPILE CLANG_PATH HOMES KVER COMMAND SWAP_FILE SUBLEVEL PATCHLEVEL VERSION GCC_DIR FILE FILE_NAME MATCHED_DIR FOLDER FOLDER_NAME GCC64 GCC32 NEED_GCC
+         
+         find out/arch/${{ inputs.arch }}/boot/dts/vendor/qcom -name '*.dtb' -exec cat {} + >out/arch/${{ inputs.arch }}/boot/dtb
 
          if [ ${{ inputs.anykernel3 }} = false ]; then
             echo "::group:: Preparing to Upload boot.img"
@@ -493,7 +577,8 @@ runs:
          else
             echo "::group:: Packaging Anykernel3 flasher"
             if [ ! -z ${{ inputs.anykernel3-url }} ]; then
-                git clone ${{ inputs.anykernel3-url }} AnyKernel3
+                git clone --recursive --depth=1 -j $(nproc) --branch munch ${{ inputs.anykernel3-url }} AnyKernel3
+                sed -i 's/kernel.string=ExampleKernel by Norikimika/kernel.string=${{ inputs.anykernel3-string-name }}/g' AnyKernel3/anykernel.sh
             else
                 git clone https://github.com/osm0sis/AnyKernel3
                 sed -i 's!BLOCK=/dev/block/platform/omap/omap_hsmmc.0/by-name/boot;!BLOCK=auto;!g' AnyKernel3/anykernel.sh
@@ -512,13 +597,17 @@ runs:
             test -f out/arch/${{ inputs.arch }}/boot/dtbo.img && cp -v out/arch/${{ inputs.arch }}/boot/dtbo.img AnyKernel3/
             test -f out/arch/${{ inputs.arch }}/boot/dtb && cp -v out/arch/${{ inputs.arch }}/boot/dtb AnyKernel3/
 
+            rm -rf -v AnyKernel3/.git* AnyKernel3/modules
+            rm -rf -v AnyKernel3/.git* AnyKernel3/patch
+            rm -rf -v AnyKernel3/.git* AnyKernel3/ramdisk
+            rm -rf -v AnyKernel3/.git* AnyKernel3/LICENSE
             rm -rf -v AnyKernel3/.git* AnyKernel3/README.md
             mkdir -p -v ../../build
             if [ ${{ inputs.release }} = false ]; then
                 cp -r -v AnyKernel3/* ../../build
             else
-                zip Anykernel3-flasher.zip AnyKernel3/*
-                mv -v Anykernel3-flasher.zip ../../build/
+                zip ${{ inputs.zip-name }}-${{ env.BUILD_TIME }}.zip AnyKernel3/*
+                mv -v ${{ inputs.zip-name }}-${{ env.BUILD_TIME }}.zip ../../build/
             fi
             echo "::endgroup::"
          fi
@@ -536,7 +625,7 @@ runs:
       if: ${{ inputs.release == 'false' && inputs.anykernel3 == 'true' }}
       uses: actions/upload-artifact@v4
       with:
-        name: Anykernel3-flasher
+        name: ${{ inputs.anykernel3-name }}-${{ env.BUILD_TIME }}
         path: build/*
         if-no-files-found: error
         overwrite: true
