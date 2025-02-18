@@ -38,5 +38,5 @@ jobs:
           anykernel3-name: Uvite-Munch-KSU
           anykernel3-string-name: Uvite By Norikimika
           extra-cmd: LLVM=1 LLVM_IAS=1 LD=ld.lld LTO=thin
-          extra-conf: CONFIG_TMPFS_XATTR=y CONFIG_SDCARD_FS=y CONFIG_KERNEL_GZIP=y
+          extra-conf: CONFIG_TMPFS_XATTR=y CONFIG_SDCARD_FS=y CONFIG_BUILD_ARM64_KERNEL_COMPRESSION_GZIP=y
           uv-oc: true
