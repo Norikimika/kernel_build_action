@@ -161,6 +161,10 @@ inputs:
     description: 'Extra defconfig.'
     required: false
     default: ""
+  uv-oc:
+    description: ' Undervolting Overclocking (kona).'
+    required: false
+    default: false
 
 runs:
   using: 'composite'
@@ -202,7 +206,7 @@ runs:
 
          echo "::group:: Installing Building Depend Packages"
          "$SU" apt-get update
-         "$SU" apt-get install --no-install-recommends -y binutils git make bc bison openssl curl zip kmod cpio flex libelf-dev libssl-dev libtfm-dev libc6-dev device-tree-compiler ca-certificates python3 xz-utils libc6-dev aria2 build-essential ccache pigz
+         "$SU" apt-get install --no-install-recommends -y binutils git make bc bison openssl curl zip kmod cpio flex libelf-dev libssl-dev libtfm-dev libc6-dev device-tree-compiler ca-certificates python3 xz-utils libc6-dev aria2 build-essential ccache pigz gzip
          aria2c -q https://raw.githubusercontent.com/Homebrew/install/master/uninstall.sh && NONINTERACTIVE=1 bash ./uninstall.sh -f -q
          echo "::endgroup::"
          export SWAP_FILE=$(swapon --show=NAME | tail -n 1)
@@ -348,8 +352,10 @@ runs:
              done
          fi
          
-         aria2c -q https://github.com/Norikimika/kernel_build_action/raw/munch/kona/kona-v2-gpu.dtsi
-         mv kona-v2-gpu.dtsi arch/arm64/boot/dts/vendor/qcom/
+         if [ ${{ inputs.uv-oc }} = true ]; then
+             aria2c -q https://github.com/Norikimika/kernel_build_action/raw/munch/kona/kona-v2-gpu.dtsi
+             mv kona-v2-gpu.dtsi arch/${{ inputs.arch }}/boot/dts/vendor/qcom/
+         fi
 
          function version_gt() { test "$(echo -e "$1\n$2" | sort -V | tail -n1)" == "$1"; }
          VERSION=$(grep -E '^VERSION = ' Makefile | awk '{print $3}')

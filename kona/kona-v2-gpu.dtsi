@@ -12,7 +12,7 @@
 			opp-hz = /bits/ 64 <683000000>;
 			opp-microvolt = <RPMH_REGULATOR_LEVEL_TURBO>;
 		};
-		
+
 		opp-670000000 {
 			opp-hz = /bits/ 64 <670000000>;
 			opp-microvolt = <RPMH_REGULATOR_LEVEL_NOM_L1>;
@@ -190,7 +190,7 @@
 			qcom,speed-bin = <1>;
 			qcom,initial-pwrlevel = <8>;
 			qcom,throttle-pwrlevel = <1>;
-			
+
 			qcom,gpu-pwrlevel@0 {
 				reg = <0>;
 				qcom,gpu-freq = <683000000>;
@@ -417,7 +417,7 @@
 			qcom,speed-bin = <2>;
 			qcom,initial-pwrlevel = <8>;
 			qcom,throttle-pwrlevel = <1>;
-			
+
 			qcom,gpu-pwrlevel@0 {
 				reg = <0>;
 				qcom,gpu-freq = <683000000>;
@@ -486,7 +486,7 @@
 				qcom,bus-max-ddr8 = <9>;
 
 				qcom,acd-level = <0xa02b5ffd>;
-				};
+			};
 
 			qcom,gpu-pwrlevel@5 {
 				reg = <5>;
@@ -559,7 +559,7 @@
 			qcom,speed-bin = <4>;
 			qcom,initial-pwrlevel = <8>;
 			qcom,throttle-pwrlevel = <1>;
-			
+
 			qcom,gpu-pwrlevel@0 {
 				reg = <0>;
 				qcom,gpu-freq = <683000000>;
@@ -628,7 +628,7 @@
 				qcom,bus-max-ddr8 = <9>;
 
 				qcom,acd-level = <0xa02b5ffd>;
-				};
+			};
 
 			qcom,gpu-pwrlevel@5 {
 				reg = <5>;
@@ -671,7 +671,7 @@
 
 				qcom,acd-level = <0xa02b5ffd>;
 			};
-			
+
 			qcom,gpu-pwrlevel@8 {
 				reg = <8>;
 				qcom,gpu-freq = <150000000>;
